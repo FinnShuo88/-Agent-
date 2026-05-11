@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Agent {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // coordinator, executor, monitor, analyzer, communicator
+  status      String   @default("idle") // idle, running, paused, error, offline
+  description String   @default("")
+  config      String   @default("{}") // JSON config
+  avatar      String   @default("")
+  capabilities String  @default("[]") // JSON array of capabilities
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tasks       Task[]
+  messages    Message[]
+  workflows   WorkflowAgent[]
+}
+
+model Task {
+  id             String    @id @default(cuid())
+  title          String
+  description    String    @default("")
+  status         String    @default("pending") // pending, running, completed, failed, cancelled
+  priority       String    @default("medium") // low, medium, high, critical
+  agentId        String?
+  agent          Agent?    @relation(fields: [agentId], references: [id])
+  workflowId     String?
+  workflow       Workflow? @relation(fields: [workflowId], references: [id])
+  input          String    @default("{}") // JSON input data
+  output         String    @default("{}") // JSON output data
+  error          String?
+  progress       Int       @default(0) // 0-100
+  parentTaskId   String?   // For task decomposition chains
+  depth          Int       @default(0) // Depth in the reasoning chain (0=root)
+  reasoningStep  String    @default("{}") // JSON: { thought, action, observation, nextThought }
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  completedAt    DateTime?
+}
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  status      String   @default("draft") // draft, active, running, paused, completed, failed
+  steps       String   @default("[]") // JSON array of step definitions
+  agents      WorkflowAgent[]
+  tasks       Task[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WorkflowAgent {
+  id         String   @id @default(cuid())
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id])
+  agentId    String
+  agent      Agent    @relation(fields: [agentId], references: [id])
+  role       String   @default("participant") // leader, participant, reviewer
+  step       Int      @default(0)
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  fromAgentId String?
+  fromAgent  Agent?   @relation(fields: [fromAgentId], references: [id])
+  toAgentId  String?
+  type       String   @default("info") // info, command, result, error, broadcast
+  content    String
+  metadata   String   @default("{}") // JSON metadata
+  createdAt  DateTime @default(now())
+}
+
+model SystemMetric {
+  id         String   @id @default(cuid())
+  name       String
+  value      Float
+  unit       String   @default("")
+  category   String   @default("system") // system, agent, task, workflow
+  createdAt  DateTime @default(now())
+}
+
+model CollaborationLog {
+  id          String   @id @default(cuid())
+  sessionId   String   // Collaboration session ID
+  phase       String   // decompose, reason, assign, execute, review, merge
+  fromAgentId String?
+  toAgentId   String?
+  action      String   // What action was taken
+  reasoning   String   @default("{}") // JSON: the reasoning behind this step
+  result      String   @default("{}") // JSON: result of this step
+  chainDepth  Int      @default(0) // How deep in the reasoning chain
+  createdAt   DateTime @default(now())
+}
