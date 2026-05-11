@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const { path } = await params;
-  const pathStr = path.join('/');
+  const pathStr = Array.isArray(path) ? path.join('/') : String(path);
   const search = request.nextUrl.search;
 
   try {
